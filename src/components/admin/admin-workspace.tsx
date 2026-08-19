@@ -39,7 +39,7 @@ import {
 
 const client = supabase as any;
 
-export type Section = "users" | "roles" | "permissions" | "settings" | "activity" | "security";
+export type Section = "users" | "roles" | "settings" | "activity" | "security";
 const sectionMeta: Record<Section, { title: string; subtitle: string; icon: typeof Users }> = {
   users: { title: "Users", subtitle: "Review users and their effective access", icon: Users },
   roles: {
