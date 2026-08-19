@@ -903,7 +903,11 @@ function RolesPage() {
                 selected={draftPermissions}
                 onToggle={(key, next) =>
                   setDraftPermissions((current) =>
-                    next ? [...current, key] : current.filter((value) => value !== key),
+                    next
+                      ? current.includes(key)
+                        ? current
+                        : [...current, key]
+                      : current.filter((value) => value !== key),
                   )
                 }
               />
