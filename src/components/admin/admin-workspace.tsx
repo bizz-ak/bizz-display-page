@@ -90,7 +90,22 @@ export function AdminPage({ section }: { section: Section }) {
 
 /* ---------------------------- shared building blocks ---------------------- */
 
-/** Groups the existing permission catalog by module for checkbox configuration. */
+const titleCase = (value: string) =>
+  value
+    .replace(/[_-]+/g, " ")
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+
+/** Splits a permission key into its module, submodule and action parts. */
+function permissionParts(permission: PermissionDef) {
+  const parts = permission.permission_key.split(".");
+  const submodule = parts.length >= 3 ? parts.slice(1, -1).join(" · ") : "General";
+  return { submodule: titleCase(submodule), action: titleCase(permission.action) };
+}
+
+/**
+ * Groups the permission catalog by module and then by submodule, so a business
+ * owner sees "Sales → Invoices → Create" instead of one flat list per module.
+ */
 function PermissionPicker({
   catalog,
   selected,
@@ -101,11 +116,21 @@ function PermissionPicker({
   onToggle: (permissionKey: string, next: boolean) => void;
 }) {
   const grouped = useMemo(() => {
-    const map = new Map<string, PermissionDef[]>();
+    const modules = new Map<string, Map<string, PermissionDef[]>>();
     for (const permission of catalog) {
-      map.set(permission.module, [...(map.get(permission.module) ?? []), permission]);
+      const { submodule } = permissionParts(permission);
+      const subs = modules.get(permission.module) ?? new Map<string, PermissionDef[]>();
+      subs.set(submodule, [...(subs.get(submodule) ?? []), permission]);
+      modules.set(permission.module, subs);
     }
-    return [...map.entries()];
+    return [...modules.entries()].map(([module, subs]) => ({
+      module,
+      keys: [...subs.values()].flat().map((permission) => permission.permission_key),
+      submodules: [...subs.entries()].map(([submodule, permissions]) => ({
+        submodule,
+        permissions,
+      })),
+    }));
   }, [catalog]);
 
   if (!catalog.length) {
@@ -114,34 +139,81 @@ function PermissionPicker({
 
   return (
     <div className="max-h-[46vh] space-y-3 overflow-y-auto pr-1">
-      {grouped.map(([module, permissions]) => (
-        <div key={module} className={panelSectionCls}>
-          <p className={panelLabelCls}>{module}</p>
-          <div className="mt-2 grid gap-2 sm:grid-cols-2">
-            {permissions.map((permission) => (
-              <label
-                key={permission.permission_key}
-                className="flex items-start gap-2 rounded-xl px-1 py-1 text-sm text-white/80"
-              >
+      {grouped.map(({ module, keys, submodules }) => {
+        const chosen = keys.filter((key) => selected.includes(key)).length;
+        const allChosen = chosen === keys.length;
+        return (
+          <div key={module} className={panelSectionCls}>
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
                 <Checkbox
-                  className="mt-0.5"
-                  checked={selected.includes(permission.permission_key)}
+                  checked={allChosen}
                   onCheckedChange={(checked) =>
-                    onToggle(permission.permission_key, checked === true)
+                    keys.forEach((key) => onToggle(key, checked === true))
                   }
                 />
-                <span>
-                  <span className="capitalize text-white">{permission.action}</span>
-                  <span className="block text-xs text-white/45">{permission.permission_key}</span>
-                </span>
-              </label>
-            ))}
+                <p className={panelLabelCls}>{titleCase(module)} module</p>
+              </div>
+              <span className="text-xs text-white/45">
+                {chosen}/{keys.length} selected
+              </span>
+            </div>
+
+            <div className="mt-3 space-y-3">
+              {submodules.map(({ submodule, permissions }) => {
+                const subKeys = permissions.map((permission) => permission.permission_key);
+                const subAll = subKeys.every((key) => selected.includes(key));
+                return (
+                  <div
+                    key={submodule}
+                    className="rounded-xl border border-white/10 bg-white/[0.03] p-3"
+                  >
+                    <div className="flex items-center gap-2">
+                      <Checkbox
+                        checked={subAll}
+                        onCheckedChange={(checked) =>
+                          subKeys.forEach((key) => onToggle(key, checked === true))
+                        }
+                      />
+                      <p className="text-xs font-semibold uppercase tracking-wider text-amber-200/90">
+                        {submodule}
+                      </p>
+                    </div>
+                    <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                      {permissions.map((permission) => (
+                        <label
+                          key={permission.permission_key}
+                          className="flex items-start gap-2 rounded-lg px-1 py-1 text-sm text-white/80"
+                        >
+                          <Checkbox
+                            className="mt-0.5"
+                            checked={selected.includes(permission.permission_key)}
+                            onCheckedChange={(checked) =>
+                              onToggle(permission.permission_key, checked === true)
+                            }
+                          />
+                          <span>
+                            <span className="text-white">
+                              {permissionParts(permission).action}
+                            </span>
+                            <span className="block text-xs text-white/45">
+                              {permission.description || permission.permission_key}
+                            </span>
+                          </span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
+
 
 const stateLabel: Record<EffectivePermission["state"], string> = {
   inherited: "Inherited",
