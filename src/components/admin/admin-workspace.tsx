@@ -39,18 +39,13 @@ import {
 
 const client = supabase as any;
 
-export type Section = "users" | "roles" | "permissions" | "settings" | "activity" | "security";
+export type Section = "users" | "roles" | "settings" | "activity" | "security";
 const sectionMeta: Record<Section, { title: string; subtitle: string; icon: typeof Users }> = {
   users: { title: "Users", subtitle: "Review users and their effective access", icon: Users },
   roles: {
     title: "Roles",
     subtitle: "System roles and the roles this business defines itself",
     icon: Shield,
-  },
-  permissions: {
-    title: "Permissions",
-    subtitle: "Manage the capabilities available to this business",
-    icon: Key,
   },
   settings: {
     title: "Settings",
@@ -87,7 +82,7 @@ function AdminShell({ section, children }: { section: Section; children: ReactNo
 export function AdminPage({ section }: { section: Section }) {
   if (section === "users") return <UsersPage />;
   if (section === "roles") return <RolesPage />;
-  if (section === "permissions") return <PermissionsPage />;
+  
   if (section === "settings") return <SettingsPage />;
   if (section === "activity") return <ActivityPage />;
   return <SecurityPage />;
@@ -95,7 +90,22 @@ export function AdminPage({ section }: { section: Section }) {
 
 /* ---------------------------- shared building blocks ---------------------- */
 
-/** Groups the existing permission catalog by module for checkbox configuration. */
+const titleCase = (value: string) =>
+  value
+    .replace(/[_-]+/g, " ")
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+
+/** Splits a permission key into its module, submodule and action parts. */
+function permissionParts(permission: PermissionDef) {
+  const parts = permission.permission_key.split(".");
+  const submodule = parts.length >= 3 ? parts.slice(1, -1).join(" · ") : "General";
+  return { submodule: titleCase(submodule), action: titleCase(permission.action) };
+}
+
+/**
+ * Groups the permission catalog by module and then by submodule, so a business
+ * owner sees "Sales → Invoices → Create" instead of one flat list per module.
+ */
 function PermissionPicker({
   catalog,
   selected,
@@ -106,11 +116,21 @@ function PermissionPicker({
   onToggle: (permissionKey: string, next: boolean) => void;
 }) {
   const grouped = useMemo(() => {
-    const map = new Map<string, PermissionDef[]>();
+    const modules = new Map<string, Map<string, PermissionDef[]>>();
     for (const permission of catalog) {
-      map.set(permission.module, [...(map.get(permission.module) ?? []), permission]);
+      const { submodule } = permissionParts(permission);
+      const subs = modules.get(permission.module) ?? new Map<string, PermissionDef[]>();
+      subs.set(submodule, [...(subs.get(submodule) ?? []), permission]);
+      modules.set(permission.module, subs);
     }
-    return [...map.entries()];
+    return [...modules.entries()].map(([module, subs]) => ({
+      module,
+      keys: [...subs.values()].flat().map((permission) => permission.permission_key),
+      submodules: [...subs.entries()].map(([submodule, permissions]) => ({
+        submodule,
+        permissions,
+      })),
+    }));
   }, [catalog]);
 
   if (!catalog.length) {
@@ -119,34 +139,81 @@ function PermissionPicker({
 
   return (
     <div className="max-h-[46vh] space-y-3 overflow-y-auto pr-1">
-      {grouped.map(([module, permissions]) => (
-        <div key={module} className={panelSectionCls}>
-          <p className={panelLabelCls}>{module}</p>
-          <div className="mt-2 grid gap-2 sm:grid-cols-2">
-            {permissions.map((permission) => (
-              <label
-                key={permission.permission_key}
-                className="flex items-start gap-2 rounded-xl px-1 py-1 text-sm text-white/80"
-              >
+      {grouped.map(({ module, keys, submodules }) => {
+        const chosen = keys.filter((key) => selected.includes(key)).length;
+        const allChosen = chosen === keys.length;
+        return (
+          <div key={module} className={panelSectionCls}>
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
                 <Checkbox
-                  className="mt-0.5"
-                  checked={selected.includes(permission.permission_key)}
+                  checked={allChosen}
                   onCheckedChange={(checked) =>
-                    onToggle(permission.permission_key, checked === true)
+                    keys.forEach((key) => onToggle(key, checked === true))
                   }
                 />
-                <span>
-                  <span className="capitalize text-white">{permission.action}</span>
-                  <span className="block text-xs text-white/45">{permission.permission_key}</span>
-                </span>
-              </label>
-            ))}
+                <p className={panelLabelCls}>{titleCase(module)} module</p>
+              </div>
+              <span className="text-xs text-white/45">
+                {chosen}/{keys.length} selected
+              </span>
+            </div>
+
+            <div className="mt-3 space-y-3">
+              {submodules.map(({ submodule, permissions }) => {
+                const subKeys = permissions.map((permission) => permission.permission_key);
+                const subAll = subKeys.every((key) => selected.includes(key));
+                return (
+                  <div
+                    key={submodule}
+                    className="rounded-xl border border-white/10 bg-white/[0.03] p-3"
+                  >
+                    <div className="flex items-center gap-2">
+                      <Checkbox
+                        checked={subAll}
+                        onCheckedChange={(checked) =>
+                          subKeys.forEach((key) => onToggle(key, checked === true))
+                        }
+                      />
+                      <p className="text-xs font-semibold uppercase tracking-wider text-amber-200/90">
+                        {submodule}
+                      </p>
+                    </div>
+                    <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                      {permissions.map((permission) => (
+                        <label
+                          key={permission.permission_key}
+                          className="flex items-start gap-2 rounded-lg px-1 py-1 text-sm text-white/80"
+                        >
+                          <Checkbox
+                            className="mt-0.5"
+                            checked={selected.includes(permission.permission_key)}
+                            onCheckedChange={(checked) =>
+                              onToggle(permission.permission_key, checked === true)
+                            }
+                          />
+                          <span>
+                            <span className="text-white">
+                              {permissionParts(permission).action}
+                            </span>
+                            <span className="block text-xs text-white/45">
+                              {permission.description || permission.permission_key}
+                            </span>
+                          </span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
+
 
 const stateLabel: Record<EffectivePermission["state"], string> = {
   inherited: "Inherited",
@@ -357,6 +424,21 @@ function UsersPage() {
             hideOnMobile: true,
             render: (row) =>
               row.last_seen_at ? dateTimeFmt.format(new Date(row.last_seen_at)) : "Never",
+          },
+          {
+            key: "assign",
+            label: "Role assignment",
+            render: (row) => (
+              <Button
+                className="h-8 rounded-lg bg-amber-400 px-3 text-xs font-semibold text-black hover:bg-amber-300"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  openRoleEditor(row);
+                }}
+              >
+                Assign role
+              </Button>
+            ),
           },
         ]}
         onEdit={openRoleEditor}
@@ -836,7 +918,11 @@ function RolesPage() {
                 selected={draftPermissions}
                 onToggle={(key, next) =>
                   setDraftPermissions((current) =>
-                    next ? [...current, key] : current.filter((value) => value !== key),
+                    next
+                      ? current.includes(key)
+                        ? current
+                        : [...current, key]
+                      : current.filter((value) => value !== key),
                   )
                 }
               />
@@ -856,74 +942,6 @@ function RolesPage() {
   );
 }
 
-function PermissionsPage() {
-  const [rows, setRows] = useState<any[]>([]);
-  const [selected, setSelected] = useState<any | null>(null);
-  const [assignedRoles, setAssignedRoles] = useState<string[]>([]);
-  useEffect(() => {
-    void client
-      .from("permission_catalog")
-      .select("permission_key,module,action,description,active")
-      .order("module")
-      .then(({ data }: any) =>
-        setRows((data ?? []).map((row: any) => ({ ...row, id: row.permission_key }))),
-      );
-  }, []);
-  useEffect(() => {
-    if (!selected) return;
-    void client
-      .from("role_permissions")
-      .select("role")
-      .eq("permission_key", selected.permission_key)
-      .then(({ data }: any) => setAssignedRoles((data ?? []).map((row: any) => row.role)));
-  }, [selected]);
-  return (
-    <AdminShell section="permissions">
-      <TaxTable
-        rows={rows}
-        searchKeys={(row) => `${row.permission_key} ${row.module} ${row.action}`}
-        columns={[
-          {
-            key: "permission_key",
-            label: "Permission",
-            render: (row) => <span className="font-medium text-white">{row.permission_key}</span>,
-          },
-          { key: "module", label: "Module" },
-          { key: "action", label: "Action" },
-          { key: "description", label: "Description", hideOnMobile: true },
-          {
-            key: "active",
-            label: "Status",
-            render: (row) => <StatusBadge value={row.active ? "Active" : "Inactive"} />,
-          },
-        ]}
-        onRowClick={setSelected}
-        empty={{
-          title: "No permissions configured",
-          description:
-            "Permission definitions are seeded by the platform and assigned through roles.",
-          icon: Key,
-        }}
-      />
-      <DetailsDrawer
-        open={Boolean(selected)}
-        onClose={() => setSelected(null)}
-        title={selected?.permission_key || "Permission details"}
-        description="Permission definition and current role assignments from the authorization catalog."
-        icon={Key}
-        rows={[
-          { label: "Module", value: selected?.module || "Not available" },
-          { label: "Action", value: selected?.action || "Not available" },
-          { label: "Description", value: selected?.description || "No description" },
-          {
-            label: "Assigned roles",
-            value: assignedRoles.length ? assignedRoles.join(", ") : "No roles assigned",
-          },
-        ]}
-      />
-    </AdminShell>
-  );
-}
 
 function SettingsPage() {
   const [rows, setRows] = useState<any[]>([]);

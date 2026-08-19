@@ -79,7 +79,6 @@ import { Route as AuthenticatedMAdminUsersRouteImport } from './routes/_authenti
 import { Route as AuthenticatedMAdminSettingsRouteImport } from './routes/_authenticated/m/admin.settings'
 import { Route as AuthenticatedMAdminSecurityRouteImport } from './routes/_authenticated/m/admin.security'
 import { Route as AuthenticatedMAdminRolesRouteImport } from './routes/_authenticated/m/admin.roles'
-import { Route as AuthenticatedMAdminPermissionsRouteImport } from './routes/_authenticated/m/admin.permissions'
 import { Route as AuthenticatedMAdminActivityLogsRouteImport } from './routes/_authenticated/m/admin.activity-logs'
 import { Route as AuthenticatedMCrmCustomersIdRouteImport } from './routes/_authenticated/m/crm.customers.$id'
 
@@ -483,12 +482,6 @@ const AuthenticatedMAdminRolesRoute =
     path: '/roles',
     getParentRoute: () => AuthenticatedMAdminRoute,
   } as any)
-const AuthenticatedMAdminPermissionsRoute =
-  AuthenticatedMAdminPermissionsRouteImport.update({
-    id: '/permissions',
-    path: '/permissions',
-    getParentRoute: () => AuthenticatedMAdminRoute,
-  } as any)
 const AuthenticatedMAdminActivityLogsRoute =
   AuthenticatedMAdminActivityLogsRouteImport.update({
     id: '/activity-logs',
@@ -516,7 +509,6 @@ export interface FileRoutesByFullPath {
   '/m/sales': typeof AuthenticatedMSalesRouteWithChildren
   '/m/tax': typeof AuthenticatedMTaxRouteWithChildren
   '/m/admin/activity-logs': typeof AuthenticatedMAdminActivityLogsRoute
-  '/m/admin/permissions': typeof AuthenticatedMAdminPermissionsRoute
   '/m/admin/roles': typeof AuthenticatedMAdminRolesRoute
   '/m/admin/security': typeof AuthenticatedMAdminSecurityRoute
   '/m/admin/settings': typeof AuthenticatedMAdminSettingsRoute
@@ -588,7 +580,6 @@ export interface FileRoutesByTo {
   '/m/sales': typeof AuthenticatedMSalesRouteWithChildren
   '/m/tax': typeof AuthenticatedMTaxRouteWithChildren
   '/m/admin/activity-logs': typeof AuthenticatedMAdminActivityLogsRoute
-  '/m/admin/permissions': typeof AuthenticatedMAdminPermissionsRoute
   '/m/admin/roles': typeof AuthenticatedMAdminRolesRoute
   '/m/admin/security': typeof AuthenticatedMAdminSecurityRoute
   '/m/admin/settings': typeof AuthenticatedMAdminSettingsRoute
@@ -664,7 +655,6 @@ export interface FileRoutesById {
   '/_authenticated/m/sales': typeof AuthenticatedMSalesRouteWithChildren
   '/_authenticated/m/tax': typeof AuthenticatedMTaxRouteWithChildren
   '/_authenticated/m/admin/activity-logs': typeof AuthenticatedMAdminActivityLogsRoute
-  '/_authenticated/m/admin/permissions': typeof AuthenticatedMAdminPermissionsRoute
   '/_authenticated/m/admin/roles': typeof AuthenticatedMAdminRolesRoute
   '/_authenticated/m/admin/security': typeof AuthenticatedMAdminSecurityRoute
   '/_authenticated/m/admin/settings': typeof AuthenticatedMAdminSettingsRoute
@@ -740,7 +730,6 @@ export interface FileRouteTypes {
     | '/m/sales'
     | '/m/tax'
     | '/m/admin/activity-logs'
-    | '/m/admin/permissions'
     | '/m/admin/roles'
     | '/m/admin/security'
     | '/m/admin/settings'
@@ -812,7 +801,6 @@ export interface FileRouteTypes {
     | '/m/sales'
     | '/m/tax'
     | '/m/admin/activity-logs'
-    | '/m/admin/permissions'
     | '/m/admin/roles'
     | '/m/admin/security'
     | '/m/admin/settings'
@@ -887,7 +875,6 @@ export interface FileRouteTypes {
     | '/_authenticated/m/sales'
     | '/_authenticated/m/tax'
     | '/_authenticated/m/admin/activity-logs'
-    | '/_authenticated/m/admin/permissions'
     | '/_authenticated/m/admin/roles'
     | '/_authenticated/m/admin/security'
     | '/_authenticated/m/admin/settings'
@@ -1446,13 +1433,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedMAdminRolesRouteImport
       parentRoute: typeof AuthenticatedMAdminRoute
     }
-    '/_authenticated/m/admin/permissions': {
-      id: '/_authenticated/m/admin/permissions'
-      path: '/permissions'
-      fullPath: '/m/admin/permissions'
-      preLoaderRoute: typeof AuthenticatedMAdminPermissionsRouteImport
-      parentRoute: typeof AuthenticatedMAdminRoute
-    }
     '/_authenticated/m/admin/activity-logs': {
       id: '/_authenticated/m/admin/activity-logs'
       path: '/activity-logs'
@@ -1472,7 +1452,6 @@ declare module '@tanstack/react-router' {
 
 interface AuthenticatedMAdminRouteChildren {
   AuthenticatedMAdminActivityLogsRoute: typeof AuthenticatedMAdminActivityLogsRoute
-  AuthenticatedMAdminPermissionsRoute: typeof AuthenticatedMAdminPermissionsRoute
   AuthenticatedMAdminRolesRoute: typeof AuthenticatedMAdminRolesRoute
   AuthenticatedMAdminSecurityRoute: typeof AuthenticatedMAdminSecurityRoute
   AuthenticatedMAdminSettingsRoute: typeof AuthenticatedMAdminSettingsRoute
@@ -1481,7 +1460,6 @@ interface AuthenticatedMAdminRouteChildren {
 
 const AuthenticatedMAdminRouteChildren: AuthenticatedMAdminRouteChildren = {
   AuthenticatedMAdminActivityLogsRoute: AuthenticatedMAdminActivityLogsRoute,
-  AuthenticatedMAdminPermissionsRoute: AuthenticatedMAdminPermissionsRoute,
   AuthenticatedMAdminRolesRoute: AuthenticatedMAdminRolesRoute,
   AuthenticatedMAdminSecurityRoute: AuthenticatedMAdminSecurityRoute,
   AuthenticatedMAdminSettingsRoute: AuthenticatedMAdminSettingsRoute,
