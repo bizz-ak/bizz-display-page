@@ -22,7 +22,6 @@ function AdminHub() {
   const cards = [
     { label: "Users", icon: Users, to: "/m/admin/users" },
     { label: "Roles", icon: Shield, to: "/m/admin/roles" },
-    { label: "Permissions", icon: Key, to: "/m/admin/permissions" },
     { label: "Settings", icon: SettingsIcon, to: "/m/admin/settings" },
   ];
 
