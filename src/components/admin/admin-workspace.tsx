@@ -5,6 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { RecordDialog, str, type FieldValue } from "@/components/tax/record-dialog";
+import { dateTimeFmt } from "@/lib/format";
 import {
   DetailsDrawer,
   StatusBadge,
