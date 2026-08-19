@@ -92,6 +92,49 @@ function UsersPage() {
     );
     setRoles(userRoles ?? []);
   };
+  useEffect(() => {
+    void refresh();
+  }, []);
+  useEffect(() => {
+    if (!selected) return;
+    void (async () => {
+      const [{ data: assignments }, { data: overrides }] = await Promise.all([
+        client.from("user_roles").select("role").eq("user_id", selected.id),
+        client
+          .from("user_permission_overrides")
+          .select("permission_key,effect")
+          .eq("user_id", selected.id),
+      ]);
+      const roleNames = (assignments ?? []).map((row: any) => row.role);
+      const { data: rolePermissions } = roleNames.length
+        ? await client.from("role_permissions").select("permission_key").in("role", roleNames)
+        : { data: [] };
+      const denied = new Set(
+        (overrides ?? [])
+          .filter((row: any) => row.effect === "deny")
+          .map((row: any) => row.permission_key),
+      );
+      const granted = new Set([
+        ...(rolePermissions ?? []).map((row: any) => row.permission_key),
+        ...(overrides ?? [])
+          .filter((row: any) => row.effect === "allow")
+          .map((row: any) => row.permission_key),
+      ]);
+      setEffectiveAccess([...granted].filter((permission) => !denied.has(permission)).sort());
+    })();
+  }, [selected]);
+  const save = async (value: Record<string, FieldValue>) => {
+    const role = str(value.role) as "admin" | "manager" | "cashier" | "staff";
+    const { error } = await client
+      .from("user_roles")
+      .upsert({ user_id: editing.id, role }, { onConflict: "user_id,role" });
+    if (error) toast.error(error.message);
+    else {
+      toast.success("User access updated");
+      setEditing(null);
+      await refresh();
+    }
+  };
   const toggleStatus = async (row: any) => {
     const next = row.status === "active" ? "inactive" : "active";
     const { error } = await client.from("profiles").update({ status: next }).eq("id", row.id);
