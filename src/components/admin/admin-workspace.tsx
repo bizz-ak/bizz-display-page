@@ -408,7 +408,9 @@ function PermissionsPage() {
       .from("permission_catalog")
       .select("permission_key,module,action,description,active")
       .order("module")
-      .then(({ data }: any) => setRows(data ?? []));
+      .then(({ data }: any) =>
+        setRows((data ?? []).map((row: any) => ({ ...row, id: row.permission_key }))),
+      );
   }, []);
   useEffect(() => {
     if (!selected) return;
