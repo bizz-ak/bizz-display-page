@@ -2,7 +2,7 @@ import { createFileRoute, Link, Outlet, useRouterState } from "@tanstack/react-r
 import {
   Users,
   Shield,
-  Key,
+
   Settings as SettingsIcon,
   Activity,
   ChevronRight,
@@ -45,7 +45,7 @@ function AdminHub() {
         </div>
 
         {/* Main Cards - Icon Only - Glass Effect */}
-        <div className="mt-8 md:mt-12 grid grid-cols-4 gap-4 md:gap-8">
+        <div className="mt-8 md:mt-12 grid grid-cols-3 gap-4 md:gap-8">
           {cards.map((c) => (
             <Link
               key={c.label}
