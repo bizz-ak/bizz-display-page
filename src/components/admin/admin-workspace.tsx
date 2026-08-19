@@ -47,11 +47,6 @@ const sectionMeta: Record<Section, { title: string; subtitle: string; icon: type
     subtitle: "System roles and the roles this business defines itself",
     icon: Shield,
   },
-  permissions: {
-    title: "Permissions",
-    subtitle: "Manage the capabilities available to this business",
-    icon: Key,
-  },
   settings: {
     title: "Settings",
     subtitle: "Configure supported business behavior",
