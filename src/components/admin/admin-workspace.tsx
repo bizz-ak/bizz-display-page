@@ -425,6 +425,21 @@ function UsersPage() {
             render: (row) =>
               row.last_seen_at ? dateTimeFmt.format(new Date(row.last_seen_at)) : "Never",
           },
+          {
+            key: "assign",
+            label: "Role assignment",
+            render: (row) => (
+              <Button
+                className="h-8 rounded-lg bg-amber-400 px-3 text-xs font-semibold text-black hover:bg-amber-300"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  openRoleEditor(row);
+                }}
+              >
+                Assign role
+              </Button>
+            ),
+          },
         ]}
         onEdit={openRoleEditor}
         onRowClick={setSelected}
