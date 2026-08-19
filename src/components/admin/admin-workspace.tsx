@@ -226,6 +226,13 @@ function UsersPage() {
               : "Not available",
           },
           { label: "Role", value: selected?.roles || "staff" },
+          { label: "Status", value: selected?.status || "active" },
+          {
+            label: "Last seen",
+            value: selected?.last_seen_at
+              ? dateTimeFmt.format(new Date(selected.last_seen_at))
+              : "Never",
+          },
           {
             label: "Effective permissions",
             value: effectiveAccess.length ? effectiveAccess.join(", ") : "None assigned",
