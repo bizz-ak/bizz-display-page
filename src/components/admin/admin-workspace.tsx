@@ -259,23 +259,27 @@ function RolesPage() {
   const [editing, setEditing] = useState<any | null>(null);
   const [permissionOptions, setPermissionOptions] = useState<string[]>([]);
   const refresh = async () => {
-    const [{ data }, { data: catalog }] = await Promise.all([
+    const [{ data }, { data: catalog }, { data: assignments }] = await Promise.all([
       client.from("role_permissions").select("role,permission_key,scope").order("role"),
       client
         .from("permission_catalog")
         .select("permission_key")
         .eq("active", true)
         .order("permission_key"),
+      client.from("user_roles").select("user_id,role"),
     ]);
     setPermissionOptions((catalog ?? []).map((row: any) => row.permission_key));
-    const grouped = Object.entries(
-      (data ?? []).reduce((acc: Record<string, any>, row: any) => {
-        acc[row.role] ??= { id: row.role, role: row.role, permissions: [] };
-        acc[row.role].permissions.push(row.permission_key);
-        return acc;
-      }, {}),
-    );
-    setRows(grouped.map(([, value]) => value));
+    const base: Record<string, any> = {};
+    for (const role of ROLE_OPTIONS) base[role] = { id: role, role, permissions: [], users: 0 };
+    for (const row of data ?? []) {
+      base[row.role] ??= { id: row.role, role: row.role, permissions: [], users: 0 };
+      base[row.role].permissions.push(row.permission_key);
+    }
+    for (const row of assignments ?? []) {
+      base[row.role] ??= { id: row.role, role: row.role, permissions: [], users: 0 };
+      base[row.role].users += 1;
+    }
+    setRows(Object.values(base));
   };
   useEffect(() => {
     void refresh();
