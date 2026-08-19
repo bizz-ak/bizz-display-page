@@ -15,6 +15,7 @@ import {
 } from "@/components/tax/tax-workspace";
 
 const client = supabase as any;
+const ROLE_OPTIONS = ["admin", "manager", "cashier", "staff"] as const;
 
 export type Section = "users" | "roles" | "permissions" | "settings" | "activity" | "security";
 const sectionMeta: Record<Section, { title: string; subtitle: string; icon: typeof Users }> = {
