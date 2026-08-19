@@ -476,7 +476,7 @@ function SettingsPage() {
       .from("business_settings")
       .select("setting_key,setting_value,description,updated_at")
       .order("setting_key");
-    setRows(data ?? []);
+    setRows((data ?? []).map((row: any) => ({ ...row, id: row.setting_key })));
   };
   useEffect(() => {
     void refresh();
