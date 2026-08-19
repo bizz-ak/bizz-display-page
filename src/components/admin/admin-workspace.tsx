@@ -77,7 +77,7 @@ function UsersPage() {
   const [effectiveAccess, setEffectiveAccess] = useState<string[]>([]);
   const refresh = async () => {
     const [{ data: profiles }, { data: userRoles }] = await Promise.all([
-      client.from("profiles").select("id,full_name,email,created_at"),
+      client.from("profiles").select("id,full_name,email,status,last_seen_at,created_at"),
       client.from("user_roles").select("user_id,role"),
     ]);
     setRows(
@@ -92,80 +92,72 @@ function UsersPage() {
     );
     setRoles(userRoles ?? []);
   };
-  useEffect(() => {
-    void refresh();
-  }, []);
-  useEffect(() => {
-    if (!selected) return;
-    void (async () => {
-      const [{ data: assignments }, { data: overrides }] = await Promise.all([
-        client.from("user_roles").select("role").eq("user_id", selected.id),
-        client
-          .from("user_permission_overrides")
-          .select("permission_key,effect")
-          .eq("user_id", selected.id),
-      ]);
-      const roleNames = (assignments ?? []).map((row: any) => row.role);
-      const { data: rolePermissions } = roleNames.length
-        ? await client.from("role_permissions").select("permission_key").in("role", roleNames)
-        : { data: [] };
-      const denied = new Set(
-        (overrides ?? [])
-          .filter((row: any) => row.effect === "deny")
-          .map((row: any) => row.permission_key),
-      );
-      const granted = new Set([
-        ...(rolePermissions ?? []).map((row: any) => row.permission_key),
-        ...(overrides ?? [])
-          .filter((row: any) => row.effect === "allow")
-          .map((row: any) => row.permission_key),
-      ]);
-      setEffectiveAccess([...granted].filter((permission) => !denied.has(permission)).sort());
-    })();
-  }, [selected]);
-  const save = async (value: Record<string, FieldValue>) => {
-    const role = str(value.role) as "admin" | "manager" | "cashier" | "staff";
-    const { error } = await client
-      .from("user_roles")
-      .upsert({ user_id: editing.id, role }, { onConflict: "user_id,role" });
+  const toggleStatus = async (row: any) => {
+    const next = row.status === "active" ? "inactive" : "active";
+    const { error } = await client.from("profiles").update({ status: next }).eq("id", row.id);
     if (error) toast.error(error.message);
     else {
-      toast.success("User access updated");
-      setEditing(null);
+      toast.success(next === "active" ? "User activated" : "User deactivated");
       await refresh();
     }
   };
+  const activeCount = rows.filter((row) => row.status === "active").length;
   return (
     <AdminShell section="users">
       <SummaryStrip
         items={[
           { label: "Users", value: String(rows.length), accent: true },
+          { label: "Active", value: String(activeCount) },
           { label: "Role assignments", value: String(roles.length) },
         ]}
       />
       <TaxTable
         rows={rows}
-        searchKeys={(row) => `${row.full_name} ${row.email}`}
+        searchKeys={(row) => `${row.full_name} ${row.email} ${row.status}`}
+        filter={{
+          label: "Status",
+          options: [
+            { value: "active", label: "Active" },
+            { value: "inactive", label: "Inactive" },
+          ],
+          match: (row, value) => (row.status || "active") === value,
+        }}
         columns={[
           {
             key: "full_name",
-            label: "User",
+            label: "Name",
             render: (row) => (
-              <div>
-                <div className="font-medium text-white">{row.full_name || "Unnamed user"}</div>
-                <div className="text-xs text-white/50">{row.email}</div>
-              </div>
+              <span className="font-medium text-white">{row.full_name || "Unnamed user"}</span>
             ),
           },
-          { key: "roles", label: "Roles", render: (row) => <StatusBadge value={row.roles} /> },
           {
-            key: "created_at",
-            label: "Joined",
-            render: (row) => new Date(row.created_at).toLocaleDateString(),
+            key: "email",
+            label: "Email",
+            render: (row) => <span className="text-white/70">{row.email || "—"}</span>,
+          },
+          { key: "roles", label: "Role", render: (row) => <StatusBadge value={row.roles} /> },
+          {
+            key: "status",
+            label: "Status",
+            render: (row) => <StatusBadge value={row.status || "active"} />,
+          },
+          {
+            key: "last_seen_at",
+            label: "Last seen",
+            hideOnMobile: true,
+            render: (row) => (row.last_seen_at ? dateTimeFmt.format(new Date(row.last_seen_at)) : "Never"),
           },
         ]}
         onEdit={setEditing}
         onRowClick={setSelected}
+        rowActions={(row) => [
+          { label: "Assign role", onSelect: () => setEditing(row) },
+          {
+            label: row.status === "active" ? "Deactivate user" : "Activate user",
+            onSelect: () => void toggleStatus(row),
+            danger: row.status === "active",
+          },
+        ]}
         addLabel="Assign access"
         empty={{
           title: "No users found",
@@ -173,6 +165,7 @@ function UsersPage() {
           icon: Users,
         }}
       />
+
       <DetailsDrawer
         open={Boolean(selected)}
         onClose={() => setSelected(null)}
