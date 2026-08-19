@@ -1,9 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { AdminPage } from "@/components/admin/admin-workspace";
 
 export const Route = createFileRoute("/_authenticated/m/admin/roles")({
-  component: RouteComponent,
+  component: () => <AdminPage section="roles" />,
 });
-
-function RouteComponent() {
-  return <div>Hello "/_authenticated/m/admin/roles"!</div>;
-}

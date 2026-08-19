@@ -5,6 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { RecordDialog, str, type FieldValue } from "@/components/tax/record-dialog";
+import { dateTimeFmt } from "@/lib/format";
 import {
   DetailsDrawer,
   StatusBadge,
@@ -14,6 +15,7 @@ import {
 } from "@/components/tax/tax-workspace";
 
 const client = supabase as any;
+const ROLE_OPTIONS = ["admin", "manager", "cashier", "staff"] as const;
 
 export type Section = "users" | "roles" | "permissions" | "settings" | "activity" | "security";
 const sectionMeta: Record<Section, { title: string; subtitle: string; icon: typeof Users }> = {
@@ -77,7 +79,7 @@ function UsersPage() {
   const [effectiveAccess, setEffectiveAccess] = useState<string[]>([]);
   const refresh = async () => {
     const [{ data: profiles }, { data: userRoles }] = await Promise.all([
-      client.from("profiles").select("id,full_name,email,created_at"),
+      client.from("profiles").select("id,full_name,email,status,last_seen_at,created_at"),
       client.from("user_roles").select("user_id,role"),
     ]);
     setRows(
@@ -135,37 +137,72 @@ function UsersPage() {
       await refresh();
     }
   };
+  const toggleStatus = async (row: any) => {
+    const next = row.status === "active" ? "inactive" : "active";
+    const { error } = await client.from("profiles").update({ status: next }).eq("id", row.id);
+    if (error) toast.error(error.message);
+    else {
+      toast.success(next === "active" ? "User activated" : "User deactivated");
+      await refresh();
+    }
+  };
+  const activeCount = rows.filter((row) => row.status === "active").length;
   return (
     <AdminShell section="users">
       <SummaryStrip
         items={[
           { label: "Users", value: String(rows.length), accent: true },
+          { label: "Active", value: String(activeCount) },
           { label: "Role assignments", value: String(roles.length) },
         ]}
       />
       <TaxTable
         rows={rows}
-        searchKeys={(row) => `${row.full_name} ${row.email}`}
+        searchKeys={(row) => `${row.full_name} ${row.email} ${row.status}`}
+        filter={{
+          label: "Status",
+          options: [
+            { value: "active", label: "Active" },
+            { value: "inactive", label: "Inactive" },
+          ],
+          match: (row, value) => (row.status || "active") === value,
+        }}
         columns={[
           {
             key: "full_name",
-            label: "User",
+            label: "Name",
             render: (row) => (
-              <div>
-                <div className="font-medium text-white">{row.full_name || "Unnamed user"}</div>
-                <div className="text-xs text-white/50">{row.email}</div>
-              </div>
+              <span className="font-medium text-white">{row.full_name || "Unnamed user"}</span>
             ),
           },
-          { key: "roles", label: "Roles", render: (row) => <StatusBadge value={row.roles} /> },
           {
-            key: "created_at",
-            label: "Joined",
-            render: (row) => new Date(row.created_at).toLocaleDateString(),
+            key: "email",
+            label: "Email",
+            render: (row) => <span className="text-white/70">{row.email || "—"}</span>,
+          },
+          { key: "roles", label: "Role", render: (row) => <StatusBadge value={row.roles} /> },
+          {
+            key: "status",
+            label: "Status",
+            render: (row) => <StatusBadge value={row.status || "active"} />,
+          },
+          {
+            key: "last_seen_at",
+            label: "Last seen",
+            hideOnMobile: true,
+            render: (row) => (row.last_seen_at ? dateTimeFmt.format(new Date(row.last_seen_at)) : "Never"),
           },
         ]}
         onEdit={setEditing}
         onRowClick={setSelected}
+        rowActions={(row) => [
+          { label: "Assign role", onSelect: () => setEditing(row) },
+          {
+            label: row.status === "active" ? "Deactivate user" : "Activate user",
+            onSelect: () => void toggleStatus(row),
+            danger: row.status === "active",
+          },
+        ]}
         addLabel="Assign access"
         empty={{
           title: "No users found",
@@ -173,6 +210,7 @@ function UsersPage() {
           icon: Users,
         }}
       />
+
       <DetailsDrawer
         open={Boolean(selected)}
         onClose={() => setSelected(null)}
@@ -188,6 +226,13 @@ function UsersPage() {
               : "Not available",
           },
           { label: "Role", value: selected?.roles || "staff" },
+          { label: "Status", value: selected?.status || "active" },
+          {
+            label: "Last seen",
+            value: selected?.last_seen_at
+              ? dateTimeFmt.format(new Date(selected.last_seen_at))
+              : "Never",
+          },
           {
             label: "Effective permissions",
             value: effectiveAccess.length ? effectiveAccess.join(", ") : "None assigned",
@@ -222,23 +267,27 @@ function RolesPage() {
   const [editing, setEditing] = useState<any | null>(null);
   const [permissionOptions, setPermissionOptions] = useState<string[]>([]);
   const refresh = async () => {
-    const [{ data }, { data: catalog }] = await Promise.all([
+    const [{ data }, { data: catalog }, { data: assignments }] = await Promise.all([
       client.from("role_permissions").select("role,permission_key,scope").order("role"),
       client
         .from("permission_catalog")
         .select("permission_key")
         .eq("active", true)
         .order("permission_key"),
+      client.from("user_roles").select("user_id,role"),
     ]);
     setPermissionOptions((catalog ?? []).map((row: any) => row.permission_key));
-    const grouped = Object.entries(
-      (data ?? []).reduce((acc: Record<string, any>, row: any) => {
-        acc[row.role] ??= { id: row.role, role: row.role, permissions: [] };
-        acc[row.role].permissions.push(row.permission_key);
-        return acc;
-      }, {}),
-    );
-    setRows(grouped.map(([, value]) => value));
+    const base: Record<string, any> = {};
+    for (const role of ROLE_OPTIONS) base[role] = { id: role, role, permissions: [], users: 0 };
+    for (const row of data ?? []) {
+      base[row.role] ??= { id: row.role, role: row.role, permissions: [], users: 0 };
+      base[row.role].permissions.push(row.permission_key);
+    }
+    for (const row of assignments ?? []) {
+      base[row.role] ??= { id: row.role, role: row.role, permissions: [], users: 0 };
+      base[row.role].users += 1;
+    }
+    setRows(Object.values(base));
   };
   useEffect(() => {
     void refresh();
@@ -263,8 +312,15 @@ function RolesPage() {
     <AdminShell section="roles">
       <SummaryStrip
         items={[
-          { label: "Roles", value: "4", accent: true },
-          { label: "Configured roles", value: String(rows.length) },
+          { label: "Roles", value: String(rows.length), accent: true },
+          {
+            label: "Configured roles",
+            value: String(rows.filter((row) => row.permissions.length > 0).length),
+          },
+          {
+            label: "Assigned users",
+            value: String(rows.reduce((total, row) => total + row.users, 0)),
+          },
         ]}
       />
       <TaxTable
@@ -277,8 +333,26 @@ function RolesPage() {
             render: (row) => <span className="font-medium capitalize text-white">{row.role}</span>,
           },
           {
+            key: "users",
+            label: "Users",
+            render: (row) => <span className="text-white/70">{row.users}</span>,
+          },
+          {
+            key: "permission_count",
+            label: "Permissions",
+            render: (row) => <span className="text-white/70">{row.permissions.length}</span>,
+          },
+          {
+            key: "status",
+            label: "Status",
+            render: (row) => (
+              <StatusBadge value={row.permissions.length ? "Configured" : "Unconfigured"} />
+            ),
+          },
+          {
             key: "permissions",
             label: "Assigned permissions",
+            hideOnMobile: true,
             render: (row) => (
               <span className="text-white/70">
                 {row.permissions.length ? row.permissions.join(", ") : "No permissions assigned"}
@@ -334,7 +408,9 @@ function PermissionsPage() {
       .from("permission_catalog")
       .select("permission_key,module,action,description,active")
       .order("module")
-      .then(({ data }: any) => setRows(data ?? []));
+      .then(({ data }: any) =>
+        setRows((data ?? []).map((row: any) => ({ ...row, id: row.permission_key }))),
+      );
   }, []);
   useEffect(() => {
     if (!selected) return;
@@ -400,7 +476,7 @@ function SettingsPage() {
       .from("business_settings")
       .select("setting_key,setting_value,description,updated_at")
       .order("setting_key");
-    setRows(data ?? []);
+    setRows((data ?? []).map((row: any) => ({ ...row, id: row.setting_key })));
   };
   useEffect(() => {
     void refresh();
