@@ -82,7 +82,7 @@ function AdminShell({ section, children }: { section: Section; children: ReactNo
 export function AdminPage({ section }: { section: Section }) {
   if (section === "users") return <UsersPage />;
   if (section === "roles") return <RolesPage />;
-  if (section === "permissions") return <PermissionsPage />;
+  
   if (section === "settings") return <SettingsPage />;
   if (section === "activity") return <ActivityPage />;
   return <SecurityPage />;
