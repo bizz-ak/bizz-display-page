@@ -305,8 +305,15 @@ function RolesPage() {
     <AdminShell section="roles">
       <SummaryStrip
         items={[
-          { label: "Roles", value: "4", accent: true },
-          { label: "Configured roles", value: String(rows.length) },
+          { label: "Roles", value: String(rows.length), accent: true },
+          {
+            label: "Configured roles",
+            value: String(rows.filter((row) => row.permissions.length > 0).length),
+          },
+          {
+            label: "Assigned users",
+            value: String(rows.reduce((total, row) => total + row.users, 0)),
+          },
         ]}
       />
       <TaxTable
@@ -319,8 +326,26 @@ function RolesPage() {
             render: (row) => <span className="font-medium capitalize text-white">{row.role}</span>,
           },
           {
+            key: "users",
+            label: "Users",
+            render: (row) => <span className="text-white/70">{row.users}</span>,
+          },
+          {
+            key: "permission_count",
+            label: "Permissions",
+            render: (row) => <span className="text-white/70">{row.permissions.length}</span>,
+          },
+          {
+            key: "status",
+            label: "Status",
+            render: (row) => (
+              <StatusBadge value={row.permissions.length ? "Configured" : "Unconfigured"} />
+            ),
+          },
+          {
             key: "permissions",
             label: "Assigned permissions",
+            hideOnMobile: true,
             render: (row) => (
               <span className="text-white/70">
                 {row.permissions.length ? row.permissions.join(", ") : "No permissions assigned"}
