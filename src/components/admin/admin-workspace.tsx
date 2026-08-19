@@ -855,7 +855,6 @@ function RolesPage() {
     </AdminShell>
   );
 }
-}
 
 function PermissionsPage() {
   const [rows, setRows] = useState<any[]>([]);
